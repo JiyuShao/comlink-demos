@@ -4,17 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "serve packages",
+    "preinstall": "pnpm run init",
+    "init": "git submodule update --init --recursive",
+    "serve": "serve -p 3001 packages",
+    "start:shadow-realm-demo": "pnpm --filter='shadow-realm-demo' start",
+    "start:web-worker-demo": "echo 'Serving! http://localhost:3001/web-worker-demo/'",
+    "start:websocket-demo": "pnpm --filter='websocket-demo' start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "serve": "^14.0.1"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "shadowrealm-api": "^0.8.2",
-    "ws": "^8.10.0"
   }
 }
