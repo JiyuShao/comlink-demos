@@ -2,16 +2,16 @@ const URL = require("url");
 const Express = require("express");
 const WebSocket = require("ws");
 const http = require("http");
-const { join } = require("path");
+const { join, resolve } = require("path");
 
 const { MessageChannel, MessagePort } = require("worker_threads");
 globalThis.MessageChannel = MessageChannel;
 globalThis.MessagePort = MessagePort;
 
-const Comlink = require("../../../../dist/umd/comlink.js");
+const Comlink = require("../comlink/dist/umd/comlink.js");
 
 const app = Express();
-app.use("/dist/", Express.static("../../../../dist/"));
+app.use("/dist/", Express.static(resolve(__dirname, "../comlink/dist/")));
 app.get("/", (req, res) => {
   res.sendFile(join(__dirname, "./index.html"));
 });
@@ -32,8 +32,8 @@ wss.on("connection", (ws) => {
 
 server.listen("8080");
 
-const { wrap } = require("../../../../dist/umd/string-channel.experimental.js");
-const nodeEndpoint = require("../../../../dist/umd/node-adapter.js");
+const { wrap } = require("../comlink/dist/umd/string-channel.experimental.js");
+const nodeEndpoint = require("../comlink/dist/umd/node-adapter.js");
 
 function websocketEndpoint(ws) {
   return nodeEndpoint(

@@ -1,3 +1,6 @@
 [submodule "packages/comlink"]
 	path = packages/comlink
 	url = git@github.com:GoogleChromeLabs/comlink.git
+[submodule "packages/shadowrealm-api"]
+	path = packages/shadowrealm-api
+	url = git@github.com:ambit-tsai/shadowrealm-api.git
