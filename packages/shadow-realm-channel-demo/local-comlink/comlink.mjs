@@ -267,7 +267,6 @@ function requestResponseMessage(ep, msg, transfers) {
     return new Promise(resolve => {
         const id = generateUUID();
         ep.addEventListener("message", function l(ev) {
-            ev = ev.data;
             if (!ev.data || !ev.data.id || ev.data.id !== id) {
                 return;
             }
