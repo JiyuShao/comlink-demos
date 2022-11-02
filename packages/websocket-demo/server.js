@@ -31,6 +31,7 @@ wss.on("connection", (ws) => {
 });
 
 server.listen("8080");
+console.log("Serving! http://localhost:8080");
 
 const { wrap } = require("../comlink/dist/umd/string-channel.experimental.js");
 const nodeEndpoint = require("../comlink/dist/umd/node-adapter.js");

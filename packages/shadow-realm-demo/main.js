@@ -2,98 +2,130 @@ import "/shadowrealm-api/polyfill.js";
 import * as Comlink from "/local-comlink/comlink.mjs";
 import { wrap } from "/comlink/esm/string-channel.experimental.js";
 
-(function() {
-  const sr = new ShadowRealm();
+const sr = new ShadowRealm();
 
-  const API = {};
+const API = {};
 
-  async function initCommunication() {
-    const msgHandlers = [];
-    API.onMessage = (handler) => {
-      msgHandlers.push(handler);
-    };
+async function initCommunication() {
+  const messageListeners = [];
+  API.addMessageListener = (handler) => {
+    messageListeners.push(handler);
+  };
+  API.removeMessageListener = (handler) => {
+    // TODO
+  };
 
-    const send = (msg) => {
-      msgHandlers.forEach(handler => handler(msg));
-    };
-
-    const injectSend = await sr.evaluate(`
-      globalThis.API = { msgHandlers: [] };
-      (send) => {
-        globalThis.API.send = send
-      };
-    `);
-    injectSend(send);
-
-    // 注入 send 方法到宿主
-    API.send = await sr.evaluate(`
-      globalThis.API.onMessage = (handler) => {
-        globalThis.API.msgHandlers.push(handler);
-      };
-      (msg) => {
-        globalThis.API.msgHandlers.forEach(handler => {
-          handler(msg);
-        });
-      };
-    `);
-
-     // 测试代码
-    API.onMessage((message) => {
-      console.log("host received:", message);
+  const send = (msg) => {
+    messageListeners.forEach((handler) => {
+      handler(JSON.parse(msg));
     });
+  };
 
-    await sr.evaluate(`
-      globalThis.API.send('message from sandbox');
-      '';
-    `);
+  // 注入 send 方法到沙箱
+  const injectSend = await sr.evaluate(`
+    globalThis.API = { messageListeners: [] };
+    (send) => {
+      globalThis.API.send = (msg) =>
+        send(
+          JSON.stringify({
+            data: msg,
+          })
+        );
+    };  
+  `);
+  injectSend(send);
 
-    await sr.evaluate(`
-      globalThis.API.onMessage(message => {
-        console.log('shadow realm received:', message);
+  // 注入 send 方法到宿主
+  const origionalSend = await sr.evaluate(`
+    globalThis.API.addMessageListener = (handler) => {
+      globalThis.API.messageListeners.push(handler);
+    };
+    globalThis.API.removeMessageListener = (handler) => {
+      // TODO
+    };
+    (msg) => {
+      globalThis.API.messageListeners.forEach(handler => {
+        handler(JSON.parse(msg));
       });
-    `)
+    };
+  `);
+  API.send = async function (msg) {
+    return origionalSend(
+      JSON.stringify({
+        data: msg,
+      })
+    );
+  };
 
-    API.send("message from host");
-  }
+  // 测试代码
+  API.addMessageListener((message) => {
+    console.log("host received:", message);
+  });
 
-  async function initComlink() {
-    // 该 js 将 Comlink 注入到 globalThis
-    await sr.importValue('/local-comlink/comlink.mjs', 'expose');
-    // await sr.importValue('/local-comlink/string-channel.experimental.mjs', 'wrap');
+  await sr.evaluate(`
+    globalThis.API.send({
+      msg: 'message from sandbox'
+    });
+    '';
+  `);
 
-    const api = Comlink.wrap(customEndpoint(API));
+  await sr.evaluate(`
+    globalThis.API.addMessageListener(message => {
+      console.log('shadow realm received:', message);
+    });
+  `);
 
-    await sr.evaluate(`
-      const testObj = {
-        name: 'test'
-      };
-      Comlink.expose(testObj, {
-        postMessage: (msg) => API.send(msg),
-        addEventListener: (type, handler) => {
-          if (type === 'message') {
-            API.onMessage(handler)
-          }
-        }
-      });
-      '';
-    `)
+  API.send({
+    msg: "message from host",
+  });
+}
 
-    console.log(await api.name)
-  }
+async function initComlink() {
+  // 该 js 将 Comlink 注入到 globalThis
+  await sr.importValue("/local-comlink/comlink.mjs", "expose");
+  // await sr.importValue('/local-comlink/string-channel.experimental.mjs', 'wrap');
 
+  const sandboxApi = Comlink.wrap(customEndpoint(API));
 
-  function customEndpoint(api) {
-    return {
-      postMessage: (msg) => api.send(msg),
-      addEventListener: (type, handler) => {
-        if (type === 'message') {
-          api.onMessage(handler);
-        }
+  await sr.evaluate(`
+    const testObj = {
+      name: 'test',
+      testFn: () => {
+        console.log('### run sandbox testFn');
+        return 123
       }
     };
-  }
+    Comlink.expose(testObj, {
+      postMessage: (msg) => {
+        globalThis.API.send(msg);
+      },
+      addEventListener: (type, handler) => {
+        if (type === 'message') {
+          globalThis.API.addMessageListener(handler);
+        }
+      }
+    });
+    '';
+  `);
+  console.log("### await sandboxApi.testFn", await sandboxApi.testFn());
+  console.log("### await sandboxApi.name", await sandboxApi.name);
+}
 
-  initCommunication();
-  initComlink();
-})()
+function customEndpoint(api) {
+  return {
+    postMessage: (msg) => api.send(msg),
+    addEventListener: (type, handler) => {
+      if (type === "message") {
+        api.addMessageListener(handler);
+      }
+    },
+    removeEventListener: (type, handler) => {
+      if (type === "message") {
+        api.removeMessageListener(handler);
+      }
+    },
+  };
+}
 
+initCommunication();
+initComlink();
