@@ -1,6 +1,6 @@
 import "/shadowrealm-api/polyfill.js";
 import * as Comlink from "/local-comlink/comlink.mjs";
-import { wrap } from "/comlink/esm/string-channel.experimental.js";
+// import { wrap } from "/comlink/esm/string-channel.experimental.js";
 
 const sr = new ShadowRealm();
 
@@ -57,7 +57,7 @@ async function initCommunication() {
     );
   };
 
-  // 测试代码
+  // 测试通信代码
   API.addMessageListener((message) => {
     console.log("host received:", message);
   });
@@ -80,6 +80,7 @@ async function initCommunication() {
   });
 }
 
+// 测试 comlink 代码
 async function initComlink() {
   // 该 js 将 Comlink 注入到 globalThis
   await sr.importValue("/local-comlink/comlink.mjs", "expose");
@@ -90,9 +91,16 @@ async function initComlink() {
   await sr.evaluate(`
     const testObj = {
       name: 'test',
-      testFn: () => {
-        console.log('### run sandbox testFn');
-        return 123
+      testFn: (...args) => {
+        console.log('### run sandbox testFn, args:', args);
+        return {
+          type: 'testFn return',
+          value: {
+            a: 1,
+            b: 2
+          },
+          testReturnFn: () => console.log('### testReturnFn')
+        }
       }
     };
     Comlink.expose(testObj, {
@@ -107,7 +115,10 @@ async function initComlink() {
     });
     '';
   `);
-  console.log("### await sandboxApi.testFn", await sandboxApi.testFn());
+  const result = await sandboxApi.testFn(1, "2");
+  console.log("### await sandboxApi.testFn", result);
+  // 通信是通过 string 来进行通信的，目前只封装一层，后续有需要可优化
+  // result.testReturnFn();
   console.log("### await sandboxApi.name", await sandboxApi.name);
 }
 
